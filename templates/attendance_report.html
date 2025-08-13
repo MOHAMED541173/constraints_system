@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>דו"ח נוכחות עובדים</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            direction: rtl;
+            background: url("{{ url_for('static', filename='atom_bg.gif') }}") no-repeat center center fixed;
+            background-size: cover;
+            padding: 80px 40px 40px 40px;
+        }
+
+        .logo {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 999;
+        }
+
+        .logo img {
+            height: 50px;
+            cursor: pointer;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .filter {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        select {
+            padding: 10px;
+            font-size: 16px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
+            color: white;
+        }
+
+        th {
+            background-color: rgba(0, 123, 255, 0.85);
+        }
+
+        tr:hover {
+            background-color: rgba(255, 255, 255, 0.07);
+        }
+
+        option {
+            color: black;
+        }
+    </style>
+</head>
+<body>
+    <!-- Logo -->
+    <div class="logo">
+        <a href="/manager">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+        </a>
+    </div>
+
+    <h1>דו"ח נוכחות עובדים</h1>
+
+    <div class="filter">
+        <label for="workerFilter" style="color:white;">בחר עובד:</label>
+        <select id="workerFilter" onchange="filterShifts()">
+            <option value="all">כל העובדים</option>
+        </select>
+    </div>
+
+    <table id="attendanceTable">
+        <thead>
+            <tr>
+                <th>שם עובד</th>
+                <th>מזהה עובד</th>
+                <th>כניסה</th>
+                <th>יציאה</th>
+                <th>משך</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        let allShifts = [];
+
+        function fetchData() {
+            const cid = localStorage.getItem('company_id') || '';
+            fetch('/get_attendance?company_id=' + encodeURIComponent(cid))
+                .then(res => res.json())
+                .then(data => {
+                    allShifts = data;
+                    const select = document.getElementById('workerFilter');
+                    const names = [...new Set(data.map(s => s.name))];
+                    names.forEach(name => {
+                        const option = document.createElement('option');
+                        option.value = name;
+                        option.textContent = name;
+                        select.appendChild(option);
+                    });
+                    renderTable(data);
+                })
+                .catch(err => {
+                    console.error('שגיאה בטעינת הנתונים:', err);
+                });
+        }
+
+        function filterShifts() {
+            const selected = document.getElementById('workerFilter').value;
+            const filtered = selected === 'all' ? allShifts : allShifts.filter(s => s.name === selected);
+            renderTable(filtered);
+        }
+
+        function calculateDuration(checkIn, checkOut) {
+            if (!checkIn || !checkOut) return '-';
+
+            const inTime = new Date(checkIn);
+            const outTime = new Date(checkOut);
+
+            if (isNaN(inTime) || isNaN(outTime)) return '-';
+
+            const diff = (outTime - inTime) / 1000;
+            const h = String(Math.floor(diff / 3600)).padStart(2, '0');
+            const m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+            const s = String(Math.floor(diff % 60)).padStart(2, '0');
+
+            return `${h}:${m}:${s}`;
+        }
+
+        function renderTable(shifts) {
+            const tbody = document.querySelector('#attendanceTable tbody');
+            tbody.innerHTML = '';
+            shifts.forEach(s => {
+                const tr = document.createElement('tr');
+                const duration = calculateDuration(s.check_in, s.check_out);
+                tr.innerHTML = `
+                    <td>${s.name}</td>
+                    <td>${s.worker_id}</td>
+                    <td>${s.check_in || '-'}</td>
+                    <td>${s.check_out || '-'}</td>
+                    <td>${duration || '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', fetchData);
+    </script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>צפייה באילוצים</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 30px;
+            background: url("{{ url_for('static', filename='atom_bg.gif') }}") no-repeat center center fixed;
+            background-size: cover;
+            direction: rtl;
+            color: white;
+        }
+
+        .logo-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .logo-container img {
+            width: 60px;
+            cursor: pointer;
+        }
+
+        .logo-container button {
+            margin-top: 10px;
+            padding: 6px 14px;
+            font-size: 14px;
+            background-color: rgba(0, 123, 255, 0.9);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .logo-container button:hover {
+            background-color: rgba(0, 86, 179, 0.95);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 90%;
+            margin: auto;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 14px;
+            border: 1px solid rgba(255,255,255,0.3);
+            text-align: center;
+            color: white;
+        }
+
+        th {
+            background-color: rgba(33, 150, 243, 0.85);
+        }
+
+        tr:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+            transition: background-color 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Logo + Edit Button -->
+    <div class="logo-container">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" onclick="location.href='/manager'">
+        {% if is_manager %}
+        <button onclick="location.href='/edit_constraints'">עריכה</button>
+        {% endif %}
+    </div>
+
+    <h2>📋 צפייה באילוצים</h2>
+    <input
+        type="text"
+        id="search-constraints"
+        placeholder="חפש לפי שם, מזהה, יום או משמרת…"
+        style="display:block;margin:0 auto 16px auto;padding:10px 14px;width:280px;border-radius:8px;border:1px solid #ccc;"
+    />
+
+    <table id="constraints-table">
+        <thead>
+            <tr>
+                <th>שם העובד</th>
+                <th>מזהה עובד</th>
+                <th>יום</th>
+                <th>משמרת</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        function attachSearch() {
+            const input = document.getElementById('search-constraints');
+            if (!input) return;
+
+            const filterRows = () => {
+            const q = (input.value || '').trim().toLowerCase();
+            const rows = document.querySelectorAll('#constraints-table tbody tr');
+            let visible = 0;
+
+            rows.forEach(tr => {
+                const text = tr.textContent.toLowerCase();
+                const show = !q || text.includes(q);
+                tr.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+
+            // optional: show a friendly "no results" row
+            let emptyRow = document.getElementById('no-constraints-row');
+            if (!visible) {
+                if (!emptyRow) {
+                emptyRow = document.createElement('tr');
+                emptyRow.id = 'no-constraints-row';
+                emptyRow.innerHTML = `<td colspan="4" style="text-align:center;color:#ddd;">אין תוצאות</td>`;
+                document.querySelector('#constraints-table tbody').appendChild(emptyRow);
+                }
+            } else if (emptyRow) {
+                emptyRow.remove();
+            }
+            };
+
+            input.addEventListener('input', filterRows);
+            // expose so we can call it after rendering rows
+            return filterRows;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const cid = localStorage.getItem('company_id') || '';
+            if (!cid) {
+            alert('לא נבחרה חברה. חזור לעמוד הראשי ובחר חברה לפני צפייה באילוצים.');
+            return;
+            }
+
+            const runFilter = attachSearch();
+
+            fetch('/api/view_constraints?company_id=' + encodeURIComponent(cid))
+            .then(res => {
+                if (!res.ok) throw new Error("Network response was not ok");
+                return res.json();
+            })
+            .then(data => {
+                const tbody = document.querySelector('#constraints-table tbody');
+                tbody.innerHTML = '';
+                data.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.name || '—'}</td>
+                    <td>${item.worker_id}</td>
+                    <td>${item.day}</td>
+                    <td>${item.time}</td>
+                `;
+                tbody.appendChild(row);
+                });
+                // run once so the current query (if any) applies to fresh rows
+                if (typeof runFilter === 'function') runFilter();
+            })
+            .catch(err => {
+                alert("אירעה שגיאה בטעינת האילוצים");
+                console.error(err);
+            });
+        });
+    </script>
+
+</body>
+</html>

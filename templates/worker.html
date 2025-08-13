@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+    <meta charset="UTF-8">
+    <title>עמוד עובד</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            direction: rtl;
+            height: 100vh;
+            background: url("{{ url_for('static', filename='atom_bg.gif') }}") no-repeat center center fixed;
+            background-size: cover;
+        }
+
+        .sidebar {
+            width: 180px;
+            background: rgba(52, 58, 64, 0.9);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
+            box-shadow: -2px 0 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .sidebar img {
+            height: 50px;
+            margin-bottom: 15px;
+        }
+
+        .sidebar h3 {
+            margin: 0 0 20px;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .sidebar-btn {
+            width: 100px;
+            height: 100px;
+            background: rgba(0, 123, 255, 0.85);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            margin: 10px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.3s ease, background 0.3s ease;
+        }
+        .sidebar-btn span { font-size: 12px; margin-top: 5px; }
+        .sidebar-btn:hover { transform: translateY(-4px); background: rgba(0, 86, 179, 0.85); }
+
+        .sidebar-btn.logout { background: rgba(220, 53, 69, 0.85); }
+        .sidebar-btn.logout:hover { background: rgba(200, 35, 51, 0.9); }
+
+        .content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            color: white;
+        }
+
+        h2, h3, p { text-align: center; }
+
+        table {
+            width: 95%;
+            margin: 20px auto;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        th, td {
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 12px;
+            text-align: center;
+            color: white;
+        }
+
+        th { background-color: rgba(0, 123, 255, 0.9); }
+
+        tr:hover { background-color: rgba(255, 255, 255, 0.05); transition: background-color 0.3s ease; }
+
+        .section { margin-top: 30px; }
+
+        #messageModal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            width: 300px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        #messageModal textarea { width: 100%; resize: none; }
+        #messageModal button { margin-top: 10px; }
+
+        /* פאנל “הבקשות שלי” */
+        .panel {
+            position: fixed;
+            top: 40px; left: 40px;
+            width: 420px;
+            max-height: calc(100vh - 80px);
+            overflow-y: auto;
+            background: rgba(255,255,255,0.96);
+            color: #222;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.2);
+            padding: 16px;
+            display: none;
+            z-index: 9998;
+        }
+        .panel-header {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px;
+        }
+        .panel-header h3 { margin: 0; color: #007bff; }
+        .panel .close-btn {
+            background: #dc3545; color: white; border: none;
+            padding: 6px 10px; border-radius: 6px; cursor: pointer;
+        }
+        .panel .close-btn:hover { background:#b02a37; }
+
+        .req {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+        }
+        .req-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+        .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; }
+        .badge-read   { background:#e7f5ff; color:#0c5460; border:1px solid #b6e0fe; }
+        .badge-unread { background:#fff3cd; color:#856404; border:1px solid #ffe8a1; }
+        .req time { display:block; font-size:12px; color:#666; margin-top:6px; text-align:left; }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+        <h3>תפריט</h3>
+        <button class="sidebar-btn" onclick="submitConstraints()">
+            ➕ <span>שלח אילוצים</span>
+        </button>
+        <button class="sidebar-btn" onclick="generateScheduleTable()">
+            ⏱ <span>טבלת אילוצים</span>
+        </button>
+        <button class="sidebar-btn" onclick="window.location.href='/view_schedule'">
+            📅 <span>צפייה בשיבוץ</span>
+        </button>
+        <button class="sidebar-btn" onclick="window.location.href='/shift_timer'">
+            ⌛ <span>ניהול משמרת</span>
+        </button>
+        <button class="sidebar-btn" onclick="openModal()">
+            💬 <span>שליחת בקשה</span>
+        </button>
+        <!-- כפתור “הבקשות שלי” -->
+        <button class="sidebar-btn" onclick="toggleMyRequests()">
+            📨 <span>הבקשות שלי</span>
+        </button>
+
+        <button class="sidebar-btn logout" onclick="logout()">
+            🚪 <span>התנתק</span>
+        </button>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content">
+        <h3 id="greeting"></h3>
+        <h2>הזנת אילוצים אישיים</h2>
+        <p>סמן את המשמרות בהן <strong>אינך זמין</strong> לעבודה:</p>
+
+        <table id="constraints-table">
+            <thead>
+                <tr id="day-date-header">
+                    <th>שעה \ יום</th>
+                </tr>
+            </thead>
+            <tbody id="constraints-body"></tbody>
+        </table>
+
+        <div id="schedule-table" class="section"></div>
+        <div class="section" id="schedule"></div>
+    </div>
+
+    <!-- Message Modal (send) -->
+    <div id="messageModal">
+        <h3>שליחת בקשה למנהל</h3>
+        <textarea id="messageContent" rows="5"></textarea>
+        <div style="text-align: right; margin-top: 10px;">
+            <button onclick="sendMessage()">שלח</button>
+            <button onclick="closeModal()">בטל</button>
+        </div>
+    </div>
+
+    <!-- פאנל “הבקשות שלי” -->
+    <div id="myRequestsPanel" class="panel">
+        <div class="panel-header">
+            <h3>הבקשות שלי</h3>
+            <button class="close-btn" onclick="toggleMyRequests()">סגור</button>
+        </div>
+        <div id="myRequestsContainer">טוען...</div>
+    </div>
+
+    <script>
+        const days = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+        const workerId = localStorage.getItem("workerId");
+        if (!workerId) {
+            alert("אירעה שגיאה: מזהה העובד לא נמצא. אנא התחבר מחדש.");
+            window.location.href = "/";
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const greetingEl = document.getElementById("greeting");
+
+            // 1) Try cached name first (set in index.html after login)
+            const cachedName = localStorage.getItem("workerName");
+            if (cachedName && cachedName.trim()) {
+                greetingEl.innerText = `שלום, ${cachedName}! ברוך הבא`;
+            } else {
+                // 2) Fallback: fetch from server (optional endpoint)
+                fetch(`/get_worker_name/${workerId}`)
+                .then(r => r.ok ? r.json() : { name: null })
+                .then(data => {
+                    const name = (data && data.name) ? data.name : "";
+                    greetingEl.innerText = name ? `שלום, ${name}! ברוך הבא` : "שלום! ברוך הבא";
+                    if (name) localStorage.setItem("workerName", name); // cache for next time
+                })
+                .catch(() => {
+                    greetingEl.innerText = "שלום! ברוך הבא";
+                });
+            }
+            loadShiftTypes();
+
+            fetch('/get_week_dates')
+                .then(res => res.json())
+                .then(weekDates => {
+                const headerRow = document.getElementById('day-date-header');
+                headerRow.innerHTML = '<th>שעה \\ יום</th>' + days.map((day, i) =>
+                    `<th>${day}<br><small style="color: #ccc; font-size: 12px;">${weekDates[i]}</small></th>`
+                ).join('');
+                });
+            });
+
+
+        function loadShiftTypes() {
+            fetch('/get_shift_types')
+                .then(res => res.json())
+                .then(shifts => {
+                    const tbody = document.getElementById('constraints-body');
+                    tbody.innerHTML = '';
+                    shifts.forEach((shift, rowIndex) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td>${shift.name}</td>` + days.map((day, colIndex) => {
+                            return `<td><input type="checkbox" id="c-${rowIndex}-${colIndex}" data-day="${day}" data-time="${shift.name}"></td>`;
+                        }).join('');
+                        tbody.appendChild(tr);
+                    });
+                    window.loadedShiftNames = shifts.map(s => s.name);
+                });
+        }
+
+        function submitConstraints() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+            const constraints = Array.from(checkboxes).map(cb => ({
+                day: cb.getAttribute("data-day"),
+                time: cb.getAttribute("data-time")
+            }));
+
+            fetch("/submit_constraints", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ employee: workerId, constraints })
+            })
+            .then(res => res.json())
+            .then(() => alert("האילוצים נשמרו בהצלחה!"))
+            .catch(() => alert("שגיאה בשליחת אילוצים."));
+        }
+
+        let constraintsVisible = true;
+        function generateScheduleTable() {
+            const container = document.getElementById('schedule-table');
+            if (constraintsVisible) {
+                container.innerHTML = '';
+                constraintsVisible = false;
+                return;
+            }
+            const times = window.loadedShiftNames || [];
+            const table = document.createElement('table');
+            const header = document.createElement('tr');
+            header.innerHTML = '<th>שעה \\ יום</th>' + days.map(day => `<th>${day}</th>`).join('');
+            table.appendChild(header);
+
+            times.forEach((time, rowIndex) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${time}</td>` + days.map((_, i) => {
+                    const cb = document.querySelector(`#c-${rowIndex}-${i}`);
+                    return `<td>${cb && cb.checked ? '✔️' : ''}</td>`;
+                }).join('');
+                table.appendChild(row);
+            });
+
+            container.innerHTML = '';
+            container.appendChild(table);
+            constraintsVisible = true;
+        }
+
+        function logout() {
+            localStorage.removeItem("workerId");
+            localStorage.removeItem("workerName");
+            window.location.href = "/";
+        }
+
+        function openModal() {
+            document.getElementById("messageModal").style.display = "block";
+        }
+        function closeModal() {
+            document.getElementById("messageModal").style.display = "none";
+            document.getElementById("messageContent").value = "";
+        }
+
+        function sendMessage() {
+            const content = document.getElementById("messageContent").value;
+            if (!content.trim()) {
+                alert("אנא כתוב את ההודעה שלך.");
+                return;
+            }
+            fetch('/send_message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ worker_id: workerId, content: content })
+            }).then(res => {
+                if (res.ok) {
+                    alert("הבקשה נשלחה בהצלחה!");
+                    closeModal();
+                    if (document.getElementById('myRequestsPanel').style.display === 'block') {
+                        loadMyRequests();
+                    }
+                } else {
+                    alert("שגיאה בשליחת הבקשה.");
+                }
+            });
+        }
+
+        // ===== הבקשות שלי =====
+        function toggleMyRequests() {
+            const panel = document.getElementById('myRequestsPanel');
+            const isOpen = panel.style.display === 'block';
+            panel.style.display = isOpen ? 'none' : 'block';
+            if (!isOpen) loadMyRequests();
+        }
+
+        function loadMyRequests() {
+            const container = document.getElementById('myRequestsContainer');
+            container.innerHTML = 'טוען...';
+
+            // מושך היסטוריה של הבקשות רק לעובד הנוכחי (לא מציג שנמחקו)
+            fetch(`/get_messages_by_worker/${encodeURIComponent(workerId)}`)
+                .then(r => r.json())
+                .then(mine => {
+                    if (!Array.isArray(mine) || mine.length === 0) {
+                        container.innerHTML = '<p>אין בקשות להצגה.</p>';
+                        return;
+                    }
+
+                    container.innerHTML = mine.map(msg => {
+                        const status = msg.is_read
+                            ? '<span class="badge badge-read">נקראה</span>'
+                            : '<span class="badge badge-unread">לא נקראה</span>';
+                        const ts = new Date(msg.timestamp).toLocaleString('he-IL');
+                        return `
+                            <div class="req">
+                                <div class="req-head">
+                                    <div>${status}</div>
+                                    <div style="font-weight:bold;">בקשה #${msg.id}</div>
+                                </div>
+                                <div>${msg.content}</div>
+                                <time>${ts}</time>
+                            </div>
+                        `;
+                    }).join('');
+                })
+                .catch(() => {
+                    container.innerHTML = '<p>שגיאה בטעינת הבקשות.</p>';
+                });
+        }
+    </script>
+</body>
+</html>

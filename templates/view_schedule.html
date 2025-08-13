@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+    <meta charset="UTF-8">
+    <title>שיבוץ משמרות</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: url("{{ url_for('static', filename='atom_bg.gif') }}") no-repeat center center fixed;
+            background-size: cover;
+        }
+
+        .container {
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.85);
+            width: 90%;
+            max-width: 1000px;
+            margin: 80px auto 30px auto;
+            border-radius: 12px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+
+        .glass-container {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+            margin: 40px auto;
+            max-width: 90%;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            border: 1px solid #aaa;
+            padding: 12px;
+            text-align: center;
+            min-width: 80px;
+        }
+
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+
+        td.current {
+            background-color: #00ff00 !important;
+            font-weight: bold;
+            box-shadow: 0 0 10px 2px #00ff00;
+        }
+
+        td:hover {
+            background-color: #d8f0ff;
+            cursor: pointer;
+        }
+
+        .header-logo {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+        }
+
+        .header-logo img {
+            width: 60px;
+        }
+
+        .center-buttons {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .center-buttons button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-weight: bold;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            background-color: #f0f0f0;
+            transition: 0.3s ease;
+        }
+
+        .center-buttons button:hover {
+            background-color: #007bff;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-container">
+        <h2 class="center-title">📅 צפייה בשיבוץ</h2>
+        <div class="header-logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+        </div>
+
+        <!-- כפתורי ניווט לשבוע -->
+        <div class="center-buttons">
+            <button onclick="loadSchedule('current')">שבוע נוכחי</button>
+            <button onclick="loadSchedule('next')">שבוע הבא</button>
+        </div>
+
+        <!-- טבלה -->
+        <table class="schedule-table">
+            <thead>
+                <tr id="day-headers"></tr>
+            </thead>
+            <tbody id="schedule-body"></tbody>
+        </table>
+
+        <!-- כפתורי יצוא -->
+        <div class="center-buttons">
+            <button onclick="exportSchedule('excel')">📊 Excel - יצוא</button>
+        </div>
+    </div>
+
+    <script>
+        const days = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+        const shiftTimes = ['בוקר', 'צהריים', 'ערב', 'לילה'];
+        let currentWeekDates = [];
+        let currentWeekKey = 'current'; // נשמור איזה שבוע מוצג כרגע
+
+        function requireCompanyId() {
+            const cid = localStorage.getItem('company_id');
+            if (!cid) {
+                alert('לא נבחרה חברה. חזור לעמוד הראשי ובחר חברה לפני צפייה בשיבוץ.');
+                return null;
+            }
+            return cid;
+        }
+
+        async function loadDates(week) {
+            const res = await fetch(`/get_week_dates?week=${week}`);
+            currentWeekDates = await res.json();
+
+            const dayHeaders = document.getElementById('day-headers');
+            dayHeaders.innerHTML = '';
+            for (let i = days.length - 1; i >= 0; i--) {
+                const day = days[i];
+                dayHeaders.innerHTML += `<th>${day} <br><span style="font-size:12px;">${currentWeekDates[i]}</span></th>`;
+            }
+            dayHeaders.innerHTML += '<th>משמרת</th>'; // עמודת שם המשמרת בקצה ימין
+        }
+
+        async function loadSchedule(week) {
+            const cid = requireCompanyId();
+            if (!cid) return;
+
+            currentWeekKey = week; // עדכון השבוע הפעיל
+            await loadDates(week);
+
+            // ✅ שולחים גם company_id מה-localStorage
+            const res = await fetch(`/api/view_schedule?week=${week}&company_id=${encodeURIComponent(cid || '')}`);
+            const schedule = await res.json();
+
+            const tableBody = document.getElementById('schedule-body');
+            tableBody.innerHTML = '';
+
+            shiftTimes.forEach(shift => {
+                const row = document.createElement('tr');
+                row.innerHTML = '';
+
+                [...days].reverse().forEach(day => {
+                    const cell = document.createElement('td');
+                    const workers = schedule
+                        .filter(s => s.day === day && s.time === shift)
+                        .map(s => s.name)
+                        .join(', ');
+                    cell.textContent = workers || '—';
+
+                    const today = new Date();
+                    const todayFormatted = String(today.getDate()).padStart(2, '0') + '/' +
+                                           String(today.getMonth() + 1).padStart(2, '0');
+                    const todayIndex = [...days].reverse().indexOf(days[today.getDay()]);
+                    const currentDayIndex = [...days].reverse().indexOf(day);
+
+                    if (currentWeekKey === 'current') {
+                        const todayName = days[new Date().getDay()]; // e.g., 'רביעי'
+                        if (day === todayName && shift === getCurrentShift()) {
+                            cell.classList.add('current');
+                        }
+                    }
+
+                    row.appendChild(cell);
+                });
+
+                // ✅ עמודת שם המשמרת בסוף השורה
+                const shiftCell = document.createElement('td');
+                shiftCell.innerHTML = `<strong>${shift}</strong>`;
+                row.appendChild(shiftCell);
+
+                tableBody.appendChild(row);
+            });
+        }
+
+        function getCurrentShift() {
+            const hour = new Date().getHours();
+            if (hour >= 6 && hour < 12) return 'בוקר';
+            if (hour >= 12 && hour < 18) return 'צהריים';
+            if (hour >= 18 && hour < 22) return 'ערב';
+            return 'לילה';
+        }
+
+        function exportSchedule(format) {
+            const cid = requireCompanyId();
+            if (!cid) return;
+            // נשלח גם את השבוע שמוצג כרגע וגם company_id
+            window.location.href = `/export_schedule?week=${encodeURIComponent(currentWeekKey)}&company_id=${encodeURIComponent(cid)}&format=${encodeURIComponent(format)}`;
+        }
+
+        // טען ברירת מחדל
+        document.addEventListener('DOMContentLoaded', () => loadSchedule('current'));
+    </script>
+</body>
+</html>

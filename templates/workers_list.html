@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>רשימת עובדים</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <style>
+        body {
+            direction: rtl;
+            font-family: Arial, sans-serif;
+            background: url("{{ url_for('static', filename='atom_bg.gif') }}") no-repeat center center fixed;
+            background-size: cover;
+            margin: 0;
+            padding: 20px;
+            animation: fadeIn 1.5s ease-in-out;
+        }
+
+        #logo-link {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            text-decoration: none;
+        }
+
+        #logo-img {
+            height: 40px;
+            width: auto;
+            cursor: pointer;
+        }
+
+        h2 {
+            text-align: center;
+            color: #fff;
+            text-shadow: 0 0 5px rgba(0,0,0,0.4);
+        }
+
+        #searchInput {
+            display: block;
+            margin: 80px auto 20px auto;
+            padding: 10px;
+            width: 60%;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        table {
+            width: 95%;
+            margin: 0 auto;
+            border-collapse: collapse;
+            background-color: rgba(255,255,255,0.95);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: center;
+            position: relative;
+        }
+
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .delete-btn, .edit-btn, .save-btn {
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .delete-btn {
+            background-color: #dc3545;
+        }
+
+        .edit-btn {
+            background-color: #ffc107;
+            margin-right: 5px;
+        }
+
+        .save-btn {
+            background-color: #28a745;
+        }
+
+        tr:hover .edit-btn {
+            display: inline-block;
+        }
+
+        .edit-btn {
+            display: none;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+<a href="/manager" id="logo-link">
+    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" id="logo-img">
+</a>
+
+<h2>רשימת עובדים קיימים</h2>
+
+<input type="text" id="searchInput" placeholder="חפש לפי שם, מספר עובד או אימייל...">
+
+<table id="workers-table">
+    <thead>
+        <tr>
+            <th>מספר עובד</th>
+            <th>שם</th>
+            <th>תפקיד</th>
+            <th>תעודת זהות</th>
+            <th>טלפון</th>
+            <th>אימייל</th>
+            <th>מזהה חברה</th>
+            <th>מחיקה</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<script>
+    function createEditableCell(content, field, workerId) {
+        const td = document.createElement('td');
+        td.className = field;
+        const span = document.createElement('span');
+        span.textContent = content || '';
+
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'ערוך';
+        editBtn.className = 'edit-btn';
+        editBtn.onclick = () => {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = span.textContent;
+            td.innerHTML = '';
+            td.appendChild(input);
+
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = 'שמור';
+            saveBtn.className = 'save-btn';
+            saveBtn.onclick = () => {
+                const updatedValue = input.value;
+                fetch('/update_worker_field', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        worker_id: workerId,
+                        field: field,
+                        value: updatedValue
+                    })
+                }).then(res => {
+                    if (res.ok) {
+                        span.textContent = updatedValue;
+                        td.innerHTML = '';
+                        td.appendChild(span);
+                        td.appendChild(editBtn);
+                    } else {
+                        alert('עדכון נכשל. נסה שוב.');
+                    }
+                });
+            };
+
+            td.appendChild(saveBtn);
+        };
+
+        td.appendChild(span);
+        td.appendChild(editBtn);
+        return td;
+    }
+
+    fetch('/get_workers')
+        .then(response => response.json())
+        .then(workers => {
+            const table = document.querySelector('#workers-table tbody');
+            workers.forEach(worker => {
+                const row = document.createElement('tr');
+
+                const idTd = document.createElement('td');
+                idTd.textContent = worker.worker_id;
+                row.appendChild(idTd);
+
+                const nameTd = document.createElement('td');
+                nameTd.textContent = worker.name || '';
+                row.appendChild(nameTd);
+
+                // role (not editable)
+                const roleTd = document.createElement('td');
+                roleTd.textContent = worker.role === 'manager' ? 'מנהל' : 'עובד';
+                row.appendChild(roleTd);
+
+                // editable fields that your backend supports
+                row.appendChild(createEditableCell(worker.id_number, 'id_number', worker.worker_id));
+                row.appendChild(createEditableCell(worker.phone, 'phone', worker.worker_id));
+                row.appendChild(createEditableCell(worker.email, 'email', worker.worker_id));
+
+                // NEW: company_id (not editable)
+                const companyTd = document.createElement('td');
+                companyTd.textContent = worker.company_id ?? '';
+                row.appendChild(companyTd);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'מחק';
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.onclick = () => {
+                    fetch(`/delete_worker/${worker.worker_id}`, {
+                        method: 'DELETE'
+                    }).then(() => row.remove());
+                };
+
+                const actionTd = document.createElement('td');
+                actionTd.appendChild(deleteBtn);
+                row.appendChild(actionTd);
+
+                table.appendChild(row);
+            });
+        });
+
+    document.getElementById('searchInput').addEventListener('keyup', function () {
+        const filter = this.value.toLowerCase();
+        const rows = document.querySelectorAll('#workers-table tbody tr');
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(filter) ? '' : 'none';
+        });
+    });
+</script>
+</body>
+</html>

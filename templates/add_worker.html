@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>הוספת עובד</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+            direction: rtl;
+            background: url("{{ url_for('static', filename='atom_bg.gif') }}") no-repeat center center fixed;
+            background-size: cover;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .top-left {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+        }
+
+        .top-left img {
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .top-left img:hover {
+            transform: scale(1.1);
+        }
+
+        .form-container {
+            width: 350px;
+            padding: 40px 30px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #fff;
+        }
+
+        h2 {
+            margin-bottom: 25px;
+        }
+
+        .form-group {
+            position: relative;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            position: absolute;
+            top: -10px;
+            right: 12px;
+            background: rgba(255, 255, 255, 0.85);
+            color: #333;
+            padding: 0 5px;
+            font-size: 14px;
+            border-radius: 6px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+            background-color: rgba(255, 255, 255, 0.9);
+            color: #000;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 6px rgba(0, 123, 255, 0.4);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            font-size: 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        @media screen and (max-height: 700px) {
+            .form-container {
+                transform: scale(0.9);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top left logo button -->
+    <div class="top-left">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Back to Manager" onclick="window.location.href='/manager'">
+    </div>
+
+    <div class="form-container">
+        <h2>הוסף עובד חדש</h2>
+        <form id="addWorkerForm">
+            <div class="form-group">
+                <label for="name">שם</label>
+                <input type="text" id="name" required>
+            </div>
+            <div class="form-group">
+                <label for="password">סיסמה</label>
+                <input type="password" id="password">
+            </div>
+            <div class="form-group">
+                <label for="role">תפקיד</label>
+                <select id="role">
+                    <option value="worker">עובד</option>
+                    <option value="manager">מנהל</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="id_number">תעודת זהות</label>
+                <input type="text" id="id_number">
+            </div>
+            <div class="form-group">
+                <label for="phone">טלפון</label>
+                <input type="text" id="phone">
+            </div>
+            <div class="form-group">
+                <label for="email">אימייל</label>
+                <input type="email" id="email">
+            </div>
+            <button type="button" onclick="submitWorker(this)">שמור</button>
+        </form>
+    </div>
+
+    <script>
+    async function submitWorker(btn) {
+    try {
+        // נטרול כפול־לחיצה (אם העברת כפתור כ-arg: onclick="submitWorker(this)")
+        if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
+
+        const companyId   = (localStorage.getItem('company_id')   || '').trim();
+        const companyName = (localStorage.getItem('company_name') || '').trim();
+
+        // בדיקות שדות חובה
+        const name      = (document.getElementById('name').value || '').trim();
+        const password  = (document.getElementById('password').value || '').trim(); // לא חובה אם אצלך לא דורשים
+        const roleRaw   = (document.getElementById('role').value || 'worker').trim().toLowerCase();
+        const idNumber  = (document.getElementById('id_number').value || '').trim();
+        const phone     = (document.getElementById('phone').value || '').trim();
+        const email     = (document.getElementById('email').value || '').trim();
+
+        if (!name) {
+        alert('שם הוא שדה חובה');
+        return;
+        }
+        if (!['worker','manager','עובד','מנהל'].includes(roleRaw)) {
+        alert('תפקיד לא חוקי. בחר/י עובד או מנהל.');
+        return;
+        }
+
+        // מיפוי ערכים בעברית לאנגלית אם צריך
+        const role = (roleRaw === 'מנהל') ? 'manager'
+                : (roleRaw === 'עובד') ? 'worker'
+                : roleRaw;
+
+        if (!companyId) {
+        alert('חסרים פרטי חברה (company_id). התחבר/י מחדש כמנהל.');
+        return;
+        }
+        // אם מחייבים גם company_name, השאר את ה-if; אחרת, אפשר רק להזהיר:
+        if (!companyName) {
+        // אם MUST לחייב:
+        alert('חסרים פרטי חברה (company_name). התחבר/י מחדש כמנהל.');
+        return;
+
+        // אם רק אזהרה (לבטל את ה-return):
+        // console.warn('company_name חסר – ממשיך ללא שם חברה');
+        }
+
+        const payload = {
+        name: name,
+        password: password,     // השאר/הסר לפי הצורך אצלך בשרת
+        role: role,
+        id_number: idNumber,
+        phone: phone,
+        email: email,
+        company_id: companyId,
+        company_name: companyName
+        };
+
+        const res = await fetch('/add_worker', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+        });
+
+        // ננסה לקרוא JSON גם בשגיאה כדי לקבל message מהשרת
+        let data;
+        try {
+        data = await res.json();
+        } catch {
+        data = {};
+        }
+
+        if (!res.ok) {
+        // הצג הודעת שרת אם קיימת
+        const msg = data.message || 'שגיאה בהוספת העובד.';
+        alert(msg);
+        return;
+        }
+
+        alert(data.message || 'העובד נוסף בהצלחה!');
+        window.location.href = '/manager';
+
+    } catch (err) {
+        console.error(err);
+        alert('אירעה שגיאה בלתי צפויה בעת הוספת העובד.');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'שמור'; }
+    }
+    }
+    </script>
+
+
+
+</body>
+</html>

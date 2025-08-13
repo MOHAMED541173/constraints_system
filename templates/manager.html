@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>עמוד מנהל</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            background: url("{{ url_for('static', filename='atom_bg.gif') }}") no-repeat center center fixed;
+            background-size: cover;
+        }
+
+        .sidebar {
+            width: 180px;
+            background: rgba(52, 58, 64, 0.9);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
+            box-shadow: -2px 0 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .sidebar img {
+            height: 50px;
+            margin-bottom: 15px;
+        }
+
+        .sidebar h3 {
+            margin: 0 0 20px;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .sidebar-btn {
+            width: 100px;
+            height: 100px;
+            background: rgba(0, 123, 255, 0.85);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            margin: 10px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.3s ease, background 0.3s ease;
+        }
+
+        .sidebar-btn span {
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .sidebar-btn:hover {
+            transform: translateY(-4px);
+            background: rgba(0, 86, 179, 0.85);
+        }
+
+        .sidebar-btn.logout {
+            background: rgba(220, 53, 69, 0.85);
+        }
+
+        .sidebar-btn.logout:hover {
+            background: rgba(200, 35, 51, 0.9);
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .main-button {
+            font-size: 20px;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .main-button:hover {
+            background-color: #0056b3;
+        }
+
+        .messages-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.95);
+            color: black;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            padding: 20px;
+            display: none;
+            z-index: 999;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            position: relative;
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+            gap: 8px;
+        }
+
+        .message-header strong {
+            color: #007bff;
+        }
+
+        .delete-btn, .read-btn, .toggle-btn {
+            color: white;
+            border: none;
+            padding: 5px 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .delete-btn { background: #dc3545; }
+        .read-btn   { background: #28a745; }
+        .toggle-btn { background: #6c757d; }
+
+        .message time {
+            display: block;
+            font-size: 12px;
+            color: #555;
+            margin-top: 8px;
+            text-align: left;
+        }
+
+        .close-btn {
+            background: red;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+        }
+
+        .close-btn:hover {
+            background: darkred;
+        }
+
+        .pill {
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            background: #e9ecef;
+            color: #333;
+        }
+        .pill.read   { background: #d4edda; }
+        .pill.unread { background: #fff3cd; }
+
+        /* אזור רשימת עובדים קטן בפינה */
+        #workers-list {
+            position: absolute;
+            right: 20px;
+            bottom: 20px;
+            background: rgba(255,255,255,0.95);
+            color: #222;
+            padding: 12px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,.15);
+            width: 320px;
+            max-height: 260px;
+            overflow-y: auto;
+        }
+        #workers-list h4 {
+            margin: 0 0 8px 0;
+            font-size: 16px;
+            color: #007bff;
+        }
+        #workers-list table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        #workers-list th, #workers-list td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: center;
+        }
+        #workers-list th {
+            background: #f1f5ff;
+        }
+
+        #genBackdrop {
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,.35);
+        display: none; z-index: 998;
+        }
+        #genDialog {
+        position: fixed; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        background: #fff; color: #222;
+        border-radius: 12px; padding: 18px;
+        width: 320px; max-width: 90vw;
+        box-shadow: 0 10px 30px rgba(0,0,0,.25);
+        display: none; z-index: 999;
+        }
+        #genDialog h3 { margin: 0 0 12px 0; color: #007bff; }
+        #genDialog .actions { display: flex; gap: 8px; justify-content: space-between; }
+        #genDialog .actions button {
+        flex: 1; border: none; border-radius: 8px; padding: 10px;
+        cursor: pointer; font-weight: 700;
+        background: #007bff; color: #fff;
+        }
+        #genDialog .actions button:hover { filter: brightness(0.95); }
+        #genDialog .actions .secondary { background: #6c757d; }
+
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="System Logo">
+        <h3>תפריט</h3>
+        <div id="greeting" style="margin: 0 0 12px; font-size:14px; text-align:center;">
+            שלום, <strong id="mgrName">מנהל</strong> 👋
+        </div>
+
+        <button class="sidebar-btn" onclick="toggleShiftTypes()">
+            🛠️ <span>ניהול משמרות</span>
+        </button>
+        <button class="sidebar-btn" onclick="location.href='/add_worker_form'">
+            ➕ <span>הוסף עובד</span>
+        </button>
+        <button class="sidebar-btn" onclick="location.href='/attendance_report'">
+            🕒 <span>נוכחות עובדים</span>
+        </button>
+        <button class="sidebar-btn" onclick="location.href='/constraints'">
+            📋 <span>צפייה באילוצים</span>
+        </button>
+        <button class="sidebar-btn" onclick="openGenerateDialog()">
+            ⚙️ <span>צור שיבוץ</span>
+        </button>
+        <button class="sidebar-btn" onclick="location.href='/workers_list'">
+            👥 <span>רשימת עובדים</span>
+        </button>
+        <button class="sidebar-btn" onclick="toggleMessages()">
+            💬 <span>הודעות</span>
+        </button>
+        <button class="sidebar-btn logout" onclick="location.href='/'">
+            🚪 <span>התנתק</span>
+        </button>
+    </div>
+
+    <main>
+        <button class="main-button" onclick="openSchedule()">📅 צפייה בשיבוץ</button>
+
+        <!-- תיבה להצגת רשימת עובדים של החברה (כרגע מוסתר/מוחרז) 
+        <div id="workers-list">
+            <h4>עובדי החברה שלי</h4>
+            <div id="workers-container">
+                <p>טוען...</p>
+            </div>
+        </div>-->
+
+        <!-- Shift Types Table Panel -->
+        <div id="shift-types-section" style="display: none; position: absolute; top: 100px; right: 20px; background: rgba(255,255,255,0.95); padding: 20px; border-radius: 12px; width: 300px; box-shadow: 0 0 10px rgba(0,0,0,0.2);">
+            <h3>ניהול סוגי משמרות</h3>
+            <table id="shift-types-table" style="width: 100%; margin-bottom: 10px;">
+                <thead>
+                    <tr>
+                        <th>משמרת</th>
+                        <th>מחיקה</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+            <input type="text" id="new-shift-name" placeholder="שם משמרת" style="width: 60%;">
+            <button onclick="addShiftType()">הוסף</button>
+        </div>
+
+        <div class="messages-panel" id="messagesPanel">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;">
+                <h3 style="margin:0;">הודעות</h3>
+                <div style="display:flex; gap:8px;">
+                    <button id="toggleShowBtn" class="toggle-btn" onclick="toggleShowMode()">מציג: לא נקראו</button>
+                    <button class="close-btn" style="position:static; background:#dc3545;" onclick="toggleMessages()">סגור</button>
+                </div>
+            </div>
+            <div id="messagesContainer"></div>
+</div>
+<div id="genBackdrop" onclick="closeGenerateDialog()"></div>
+<div id="genDialog">
+  <h3>איזה שבוע לייצר?</h3>
+  <div class="actions">
+    <button onclick="doGenerate('current')">שבוע נוכחי</button>
+    <button onclick="doGenerate('next')">שבוע הבא</button>
+    <button class="secondary" onclick="closeGenerateDialog()">בטל</button>
+  </div>
+  <p style="font-size:12px;color:#555;margin-top:10px;">
+    הפעולה תדרוס שיבוץ קיים לשבוע שנבחר עבור החברה הנוכחית.
+  </p>
+</div>
+    </main>
+
+    <script>
+        function getCidOrAlert() {
+            const cid = localStorage.getItem('company_id');
+            if (!cid) {
+                alert("לא נבחרה חברה. חזור לעמוד הראשי ובחר חברה לפני פעולה זו.");
+                return null;
+            }
+            return cid;
+        }
+
+        function openSchedule() {
+            const cid = getCidOrAlert();
+            if (!cid) return;
+            location.href = `/view_schedule?company_id=${encodeURIComponent(cid)}`;
+        }
+
+        function openGenerateDialog() {
+            const cid = getCidOrAlert();
+            if (!cid) return;
+            document.getElementById('genBackdrop').style.display = 'block';
+            document.getElementById('genDialog').style.display = 'block';
+        }
+
+        function closeGenerateDialog() {
+            document.getElementById('genBackdrop').style.display = 'none';
+            document.getElementById('genDialog').style.display = 'none';
+        }
+
+        async function doGenerate(week) {
+            const cid = getCidOrAlert();
+            if (!cid) return;
+            try {
+                const res = await fetch(`/generate_schedule?week=${encodeURIComponent(week)}&company_id=${encodeURIComponent(cid)}`, { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'שגיאה ביצירת השיבוץ');
+
+                alert(data.message || 'השיבוץ נוצר בהצלחה');
+                closeGenerateDialog();
+                // אופציונלי: קפיצה ישר לצפייה בשבוע שנוצר
+                location.href = `/view_schedule?week=${encodeURIComponent(week)}&company_id=${encodeURIComponent(cid)}`;
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        function toggleShiftTypes() {
+            const section = document.getElementById('shift-types-section');
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function fetchShiftTypes() {
+            fetch('/get_shift_types')
+                .then(res => res.json())
+                .then(data => {
+                    const tbody = document.querySelector('#shift-types-table tbody');
+                    tbody.innerHTML = '';
+                    data.forEach(shift => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${shift.name}</td>
+                            <td><button onclick="deleteShiftType(${shift.id})">❌</button></td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                });
+        }
+
+        function addShiftType() {
+            const name = document.getElementById('new-shift-name').value.trim();
+            if (!name) return alert("יש להזין שם משמרת");
+
+            fetch('/add_shift_type', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            })
+            .then(res => res.json())
+            .then(() => {
+                document.getElementById('new-shift-name').value = '';
+                fetchShiftTypes();
+            });
+        }
+
+        function deleteShiftType(id) {
+            if (confirm("האם אתה בטוח שברצונך למחוק את סוג המשמרת הזה?")) {
+                fetch(`/delete_shift_type/${id}`, { method: 'DELETE' })
+                    .then(res => res.json())
+                    .then(() => fetchShiftTypes());
+            }
+        }
+
+        // ===== Messages (manager) =====
+        let showAll = false; // false = unread only (default), true = all (not deleted)
+
+        function toggleMessages() {
+            const panel = document.getElementById('messagesPanel');
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+            if (panel.style.display === 'block') loadMessages();
+        }
+
+        function toggleShowMode() {
+            showAll = !showAll;
+            document.getElementById('toggleShowBtn').textContent = showAll ? 'מציג: הכל' : 'מציג: לא נקראו';
+            loadMessages();
+        }
+
+        function loadMessages() {
+            const cid = getCidOrAlert();
+            if (!cid) return;
+
+            const showParam = showAll ? 'all' : 'unread';
+            fetch(`/get_messages?company_id=${encodeURIComponent(cid)}&show=${showParam}`)
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('messagesContainer');
+
+                    if (!Array.isArray(data) || data.length === 0) {
+                        container.innerHTML = "<p>אין הודעות להצגה.</p>";
+                        return;
+                    }
+
+                    container.innerHTML = data.map(msg => `
+                        <div class="message">
+                            <div class="message-header">
+                                <strong>${msg.name} (ID: ${msg.worker_id})</strong>
+                                <span class="pill ${msg.is_read ? 'read' : 'unread'}">${msg.is_read ? 'נקראה' : 'לא נקראה'}</span>
+                            </div>
+                            <div>${msg.content}</div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                                <time>${new Date(msg.timestamp).toLocaleString('he-IL')}</time>
+                                <div style="display:flex; gap:6px;">
+                                    ${!msg.is_read ? `<button class="read-btn" onclick="markMessageRead(${msg.id})">סמן כנקראה</button>` : ''}
+                                    <button class="delete-btn" onclick="deleteMessage(${msg.id})">מחק</button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(() => {
+                    document.getElementById('messagesContainer').innerHTML = "<p>שגיאה בטעינת ההודעות.</p>";
+                });
+        }
+
+        // mark as read (kept your endpoint)
+        function markMessageRead(messageId) {
+            fetch(`/mark_message_read/${messageId}`, { method: 'POST' })
+                .then(() => loadMessages())
+                .catch(err => console.error('שגיאה בסימון הודעה כנקראה:', err));
+        }
+
+        function deleteMessage(id) {
+            if (confirm("האם אתה בטוח שברצונך למחוק את ההודעה הזו?")) {
+                fetch(`/delete_message/${id}`, { method: 'DELETE' })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            loadMessages();
+                        } else {
+                            alert("מחיקת ההודעה נכשלה.");
+                        }
+                    });
+            }
+        }
+
+        // ===== (Optional) load workers by company =====
+        function loadWorkers() {
+            const cid = localStorage.getItem('company_id') || '';
+            fetch('/get_workers?company_id=' + encodeURIComponent(cid))
+                .then(res => res.json())
+                .then(data => {
+                    const container = document.getElementById('workers-container');
+                    if (!container) return; // if the block is commented out
+                    container.innerHTML = '';
+                    if (!Array.isArray(data) || data.length === 0) {
+                        container.innerHTML = '<p>אין עובדים להצגה</p>';
+                        return;
+                    }
+                    const tbl = document.createElement('table');
+                    const thead = document.createElement('thead');
+                    thead.innerHTML = '<tr><th>שם</th><th>תפקיד</th><th>מס\' עובד</th></tr>';
+                    tbl.appendChild(thead);
+                    const tbody = document.createElement('tbody');
+                    data.forEach(w => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td>${w.name || '-'}</td><td>${w.role || '-'}</td><td>${w.worker_id || '-'}</td>`;
+                        tbody.appendChild(tr);
+                    });
+                    tbl.appendChild(tbody);
+                    container.appendChild(tbl);
+                })
+                .catch(err => {
+                    console.error('שגיאה בטעינת עובדים:', err);
+                    const container = document.getElementById('workers-container');
+                    if (container) container.innerHTML = '<p>שגיאה בטעינת עובדים</p>';
+                });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchShiftTypes();
+            loadWorkers();
+
+            const mgr = localStorage.getItem('manager_name') || sessionStorage.getItem('manager_name') || '';
+            if (mgr) document.getElementById('mgrName').textContent = mgr;
+        });
+    </script>
+</body>
+</html>

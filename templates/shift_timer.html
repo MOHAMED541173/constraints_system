@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>ניהול משמרת</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <style>
+    body {
+      direction: rtl;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: url("{{ url_for('static', filename='atom_bg.gif') }}") no-repeat center center fixed;
+      background-size: cover;
+      color: white;
+      min-height: 100vh;
+    }
+
+    .header {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 15px;
+    }
+
+    .header img {
+      height: 50px;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+      margin-right: 20px;
+    }
+
+    .header img:hover {
+      transform: scale(1.1);
+    }
+
+    .main-content {
+      text-align: center;
+      padding: 20px;
+    }
+
+    h1, h2 {
+      color: white;
+    }
+
+    .btn {
+      font-size: 18px;
+      padding: 15px 25px;
+      margin: 10px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      color: white;
+    }
+
+    .btn-start { background-color: green; }
+    .btn-stop { background-color: red; }
+    .btn-history { background-color: #007BFF; }
+
+    .timer {
+      font-size: 2em;
+      margin: 20px 0;
+      color: #00eaff;
+    }
+
+    table {
+      margin: 30px auto;
+      border-collapse: collapse;
+      width: 85%;
+      backdrop-filter: blur(10px);
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    th, td {
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 10px;
+      text-align: center;
+    }
+
+    th {
+      background-color: rgba(0, 123, 255, 0.9);
+      color: white;
+    }
+
+    td {
+      color: white;
+      background-color: rgba(255,255,255,0.05);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" onclick="window.location.href='/worker'">
+  </div>
+
+  <div class="main-content">
+    <h1>ניהול משמרת</h1>
+
+    <div class="timer" id="timer">00:00:00</div>
+
+    <div>
+      <button class="btn btn-start" onclick="checkIn()">כניסה למשמרת</button>
+      <button class="btn btn-stop" onclick="checkOut()">יציאה מהמשמרת</button>
+      <button id="toggleShiftsBtn" class="btn btn-history" onclick="toggleShifts()">משמרות שלי</button>
+    </div>
+
+    <div id="shift-section" style="display: none;">
+      <h2>היסטוריית משמרות</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>שעת כניסה</th>
+            <th>שעת יציאה</th>
+            <th>משך עבודה</th>
+          </tr>
+        </thead>
+        <tbody id="shift-history"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let startTime;
+    let timerInterval;
+
+    function toggleShifts() {
+      const section = document.getElementById("shift-section");
+      const button = document.getElementById("toggleShiftsBtn");
+
+      if (section.style.display === "none" || section.style.display === "") {
+        section.style.display = "block";
+        button.textContent = "הסתר משמרות";
+        loadShifts();
+      } else {
+        section.style.display = "none";
+        button.textContent = "משמרות שלי";
+        document.getElementById("shift-history").innerHTML = "";
+      }
+    }
+
+    function getWorkerId() {
+      return localStorage.getItem("workerId");
+    }
+
+    function formatTime(ms) {
+      const totalSeconds = Math.floor(ms / 1000);
+      const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+      const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+      const s = String(totalSeconds % 60).padStart(2, '0');
+      return `${h}:${m}:${s}`;
+    }
+
+    function updateTimer() {
+      const elapsed = Date.now() - startTime;
+      document.getElementById("timer").textContent = formatTime(elapsed);
+    }
+
+    function checkIn() {
+      const workerId = getWorkerId();
+      if (!workerId) return alert("לא נמצא מזהה עובד");
+
+      startTime = Date.now();
+      timerInterval = setInterval(updateTimer, 1000);
+
+      fetch("/check_in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ worker_id: workerId })
+      })
+      .then(res => res.json())
+      .then(data => alert(data.message))
+      .catch(err => console.error("Error in check-in:", err));
+    }
+
+    function checkOut() {
+      const workerId = getWorkerId();
+      if (!workerId) return alert("לא נמצא מזהה עובד");
+
+      clearInterval(timerInterval);
+
+      fetch("/check_out", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ worker_id: workerId })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message);
+        loadShifts();
+      })
+      .catch(err => console.error("Error in check-out:", err));
+    }
+
+    function calculateDuration(checkIn, checkOut) {
+      if (!checkIn || !checkOut) return '-';
+      const inTime = new Date(checkIn);
+      const outTime = new Date(checkOut);
+      if (isNaN(inTime) || isNaN(outTime)) return '-';
+
+      const diff = (outTime - inTime) / 1000;
+      const h = String(Math.floor(diff / 3600)).padStart(2, '0');
+      const m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+      const s = String(Math.floor(diff % 60)).padStart(2, '0');
+      return `${h}:${m}:${s}`;
+    }
+
+    function loadShifts() {
+      const workerId = getWorkerId();
+      if (!workerId) return;
+
+      fetch(`/my_shifts/${workerId}`)
+        .then(res => res.json())
+        .then(data => {
+          const tbody = document.getElementById("shift-history");
+          tbody.innerHTML = '';
+          data.forEach(shift => {
+            const tr = document.createElement("tr");
+            const duration = calculateDuration(shift.check_in, shift.check_out);
+            tr.innerHTML = `
+              <td>${shift.check_in || '-'}</td>
+              <td>${shift.check_out || '-'}</td>
+              <td>${duration}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        })
+        .catch(err => console.error("Error loading shifts:", err));
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      if (!getWorkerId()) {
+        alert("יש להיכנס עם מזהה עובד");
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8">
+  <title>כניסה למערכת ניהול משמרות</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <style>
+    body {
+      direction: rtl;
+      font-family: Arial, sans-serif;
+      background: url("{{ url_for('static', filename='atom_bg.gif') }}") no-repeat center center fixed;
+      background-size: cover;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh; margin: 0;
+      animation: fadeIn 1.5s ease-in-out;
+    }
+    .login-box {
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      padding: 30px; border-radius: 12px; width: 320px;
+      animation: slideUp 1.2s ease-in-out, neonGlow 2s ease-in-out infinite alternate;
+      transition: transform .3s ease, box-shadow .3s ease;
+      border: 2px solid rgba(0, 123, 255, 0.6);
+      position: relative;
+    }
+    .box-logo { position: absolute; top: 10px; left: 10px; height: 40px; width: auto; }
+    .login-box:hover { transform: translateY(-3px); box-shadow: 0 0 25px rgba(0,0,0,.4); }
+    h2 { text-align: center; margin-bottom: 20px; color: #fff; text-shadow: 0 0 5px rgba(0,0,0,.4); }
+    label { display: block; margin: 10px 0 5px; color: #fff; text-shadow: 0 0 3px rgba(0,0,0,.4); }
+    input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { width: 100%; margin-top: 20px; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background-color: #0056b3; }
+    .hidden { display: none; }
+    @keyframes fadeIn { from {opacity:0} to {opacity:1} }
+    @keyframes slideUp { from {transform: translateY(50px); opacity:0} to {transform: translateY(0); opacity:1} }
+    @keyframes neonGlow {
+      0% { box-shadow: 0 0 10px #007bff, 0 0 20px #007bff, 0 0 30px #0056b3; }
+      100% { box-shadow: 0 0 20px #00c6ff, 0 0 40px #00c6ff, 0 0 60px #0056b3; }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="box-logo">
+    <h2>כניסה לניהול משמרות</h2>
+
+    <select id="user-type" onchange="toggleForms()">
+      <option value="">בחר סוג משתמש</option>
+      <option value="manager">מנהל</option>
+      <option value="worker">עובד</option>
+    </select>
+
+    <!-- טופס מנהל -->
+    <form id="manager-form" class="hidden" onsubmit="return false;">
+      <label for="manager-id">מספר מנהל:</label>
+      <input type="text" id="manager-id" placeholder="לדוגמה: 10">
+
+      <label for="manager-password">סיסמה:</label>
+      <input type="password" id="manager-password" placeholder="4324">
+
+      <button type="button" onclick="login('manager')">התחבר</button>
+    </form>
+
+    <!-- טופס עובד -->
+    <form id="worker-form" class="hidden" onsubmit="return false;">
+      <label for="worker-id">מספר עובד:</label>
+      <input type="text" id="worker-id" placeholder="לדוגמה: 11">
+
+      <label for="worker-password">סיסמה:</label>
+      <input type="password" id="worker-password" placeholder="סיסמה">
+
+      <button type="button" onclick="login('worker')">התחבר</button>
+    </form>
+
+    <!-- רישום מנהל חדש -->
+    <div style="margin-top:16px; text-align:center;">
+      <button type="button" onclick="toggleRegister()">מנהל חדש? צור חשבון</button>
+    </div>
+
+    <form id="register-form" class="hidden" style="margin-top:14px;" onsubmit="return false;">
+      <label for="reg-name">שם מלא:</label>
+      <input type="text" id="reg-name" placeholder="לדוגמה: אדם כהן">
+
+      <label for="reg-password">סיסמה:</label>
+      <input type="password" id="reg-password" placeholder="בחר סיסמה">
+
+      <label for="reg-company-name">שם חברה/אתר:</label>
+      <input type="text" id="reg-company-name" placeholder="לדוגמה: מסעדת שף בע&quot;מ">
+
+      <label for="reg-company-id">מספר חברה:</label>
+      <input type="text" id="reg-company-id" placeholder="לדוגמה: 123456789">
+
+      <button type="button" onclick="registerManager()">צור חשבון מנהל</button>
+    </form>
+  </div>
+
+  <script>
+    function toggleForms() {
+      const type = document.getElementById('user-type').value;
+      document.getElementById('manager-form').classList.add('hidden');
+      document.getElementById('worker-form').classList.add('hidden');
+      if (type === 'manager') document.getElementById('manager-form').classList.remove('hidden');
+      if (type === 'worker')  document.getElementById('worker-form').classList.remove('hidden');
+    }
+
+    async function login(type) {
+      try {
+        if (type === 'manager') {
+          const id = document.getElementById('manager-id').value.trim();
+          const password = document.getElementById('manager-password').value.trim();
+          if (!id || !password) return alert('נא למלא מספר מנהל וסיסמה');
+
+          const res = await fetch('/login_manager', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ worker_id: id, password })
+          });
+          const data = await res.json();
+
+          if (!res.ok || !data.success) return alert(data.message || 'פרטי התחברות שגויים');
+
+          // ✅ שמירת נתונים ב-localStorage
+          if (data.success) {
+            localStorage.setItem('manager_id', data.manager_id || id);
+            localStorage.setItem('company_id', data.company_id || '');
+            localStorage.setItem('company_name', data.company_name || '');
+            localStorage.setItem('manager_name', data.name || '');   
+            location.href = '/manager';
+          }
+        }
+
+        if (type === 'worker') {
+          const id = document.getElementById('worker-id').value.trim();
+          const password = document.getElementById('worker-password').value.trim();
+          if (!id || !password) return alert('נא למלא מספר עובד וסיסמה');
+
+          const res = await fetch('/login_worker', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ worker_id: id, password })
+          });
+          const data = await res.json();
+
+          if (!res.ok || !data.success) return alert(data.message || 'פרטי התחברות שגויים');
+
+          // שמירה ל-localStorage
+          localStorage.setItem('workerId', id);
+          localStorage.setItem('workerName', data.name || '');
+          if (data.company_id) localStorage.setItem('company_id', data.company_id);
+          if (data.company_name) localStorage.setItem('company_name', data.company_name);
+
+          location.href = '/worker';
+        }
+      } catch (e) {
+        console.error(e);
+        alert('שגיאה בחיבור לשרת');
+      }
+    }
+
+    function toggleRegister() {
+      document.getElementById('register-form').classList.toggle('hidden');
+    }
+
+    async function registerManager() {
+      const name = document.getElementById('reg-name').value.trim();
+      const password = document.getElementById('reg-password').value.trim();
+      const companyName = document.getElementById('reg-company-name').value.trim();
+      const companyId   = document.getElementById('reg-company-id').value.trim();
+
+      if (!name || !password || !companyName || !companyId) {
+        return alert('נא למלא שם, סיסמה, שם חברה ומספר חברה');
+      }
+
+      try {
+        const res = await fetch('/register_manager', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            name,
+            password,
+            company_name: companyName,
+            company_id: companyId
+          })
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.success === false) {
+          return alert(data.message || 'שגיאה ביצירת החשבון');
+        }
+
+        // שמירה ל-localStorage
+        if (data.manager_id)  localStorage.setItem('manager_id', String(data.manager_id));
+        if (data.company_id)  localStorage.setItem('company_id', String(data.company_id));
+        if (data.company_name) localStorage.setItem('company_name', data.company_name);
+        localStorage.setItem('manager_name', name);
+
+        alert(`נוצר חשבון מנהל בהצלחה!\nמזהה מנהל: ${data.manager_id}\nמזהה חברה: ${data.company_id}\nשם חברה: ${data.company_name}`);
+        location.href = '/manager';
+      } catch (e) {
+        console.error(e);
+        alert('שגיאה ביצירת החשבון');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', toggleForms);
+  </script>
+</body>
+</html>
